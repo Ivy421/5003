@@ -12,6 +12,7 @@ import pickle
 import json
 import os
 import copy
+import pandas
 
 from enum import Enum
 from enum import auto
@@ -914,8 +915,8 @@ def front_analysis(gaitdata):
         print("WARN: Insufficient TO events to detect HS events.")
 
 
-def cbta(gaitdata):
-
+def cbta(gaitdata , filename):
+    file_name = filename
     #JSLOW(20230807) - manually selected HS TO frames
     if hasattr(gaitdata,"manualHS") and hasattr(gaitdata,"manualTO"):
         print("CBTA bypassed using manually selected HS TO events")
@@ -1072,7 +1073,7 @@ def cbta(gaitdata):
     # xDistances = np.array([time_axis, heel_raw[Side.LEFT][:, 0], toe_raw[Side.LEFT][:, 0], heel_raw[Side.RIGHT][:, 0], toe_raw[Side.RIGHT][:, 0]]).T
     cbtwriter.writerows(xDistances)
 
-    print_analysis_HSTO(HS, TO, True, gaitdata)
+    print_analysis_HSTO(HS, TO, True, gaitdata, filename=file_name)
 
     #Angle_Speed_HSTO(HS, TO, True, gaitdata)
 
@@ -1511,7 +1512,7 @@ def shank_ang_vel_ED(avel_use: dict, est_freq: dict, fps, title_label="Gaitanaly
 # Prints several gait parameters, given the heelstrike and toeoff frames.
 # Assumes subject is walking in positive x direction.
 # def print_analysis_HSTO(HS, TO, use_gaitdata: bool, gaitdata = GaitData("none", 0), fps=50):
-def print_analysis_HSTO(HS, TO, use_gaitdata: bool, gaitdata = None, fps=50, kinedata={}):
+def print_analysis_HSTO(HS, TO, use_gaitdata: bool, gaitdata = None, fps=50, kinedata={} , filename='none'):
 
     def find_pairs(first, second):
         pairs = []
@@ -1652,67 +1653,112 @@ def print_analysis_HSTO(HS, TO, use_gaitdata: bool, gaitdata = None, fps=50, kin
     ### calculate HS and TO angle and rate for both side
 
     # initialize angle saving var, val is a 2-dim array, each row is each HS round
-    angle_TO_rad = {Side.LEFT: [], Side.RIGHT: []}
-    angle_TO_degree = {Side.LEFT: [], Side.RIGHT: []}
-    angle_HS_rad = {Side.LEFT: [], Side.RIGHT: []}
-    angle_HS_degree = {Side.LEFT: [], Side.RIGHT: []}
+    angle_TO_rad = [] # {Side.LEFT: [], Side.RIGHT: []}
+    angle_TO_degree =[] # {Side.LEFT: [], Side.RIGHT: []}
+    angle_HS_rad = [] # {Side.LEFT: [], Side.RIGHT: []}
+    angle_HS_degree = [] # {Side.LEFT: [], Side.RIGHT: []}
 
-    rate_HS_rad = {Side.LEFT: [], Side.RIGHT: []}
-    rate_HS_degree = {Side.LEFT: [], Side.RIGHT: []}
-    rate_TO_rad = {Side.LEFT: [], Side.RIGHT: []}
-    rate_TO_degree = {Side.LEFT: [], Side.RIGHT: []}
-
+    frame_HS = []
+    frame_TO = []
+    coord_heelx_HS = []
+    coord_toex_HS = []
+    coord_heelx_TO = []
+    coord_toex_TO = []
+    coord_heely_HS = []
+    coord_toey_HS = []
+    coord_heely_TO = []
+    coord_toey_TO = []
 
     # calculate HS angle
     for side in Side:
-        angle_HS_arr = [[0 for _ in range(6)] for _ in range(len(HS[side]))]
-        angle_HS_arr_degree = [[0 for _ in range(6)] for _ in range(len(HS[side]))]
+        print('heel strike angle for side %s:'%side)
+        #   angle_HS_arr =   [[[0 for _ in range(1)] for _ in range(len(HS[side]))]]
+        #   angle_HS_arr_degree =   [[0 for _ in range(1)] for _ in range(len(HS[side]))]
         for i in range (len(HS[side])):
+
             ele_HS = HS[side][i] # return the index of HS frame
-            for j in range(6):
-                res_HS = math.atan(  (-filt_heel[side][ele_HS+j][1] + filt_toe[side][ele_HS+j][1]) / (-filt_heel[side][ele_HS+j][0] + filt_toe[side][ele_HS+j][0])  )  # should be getting smaller
-                angle_HS_arr[i][j] = round(res_HS, 2)
-                angle_HS_arr_degree[i][j] = round(math.degrees(res_HS),2)
-        angle_HS_rad[side].append(angle_HS_arr)
-        angle_HS_degree[side].append(angle_HS_arr_degree)
+            print('coordinate of heel and toe:',filt_heel[side][ele_HS], filt_toe[side][ele_HS] )
+            coord_heelx_HS.append(filt_heel[side][ele_HS][0])
+            coord_toex_HS.append(filt_toe[side][ele_HS][0] )
+            coord_heely_HS.append(filt_heel[side][ele_HS][1])
+            coord_toey_HS.append(filt_toe[side][ele_HS][1] )
+
+            #for j in range(1):
+            res_HS = math.atan(  (-filt_heel[side][ele_HS][1] + filt_toe[side][ele_HS][1]) / (-filt_heel[side][ele_HS][0] + filt_toe[side][ele_HS][0])  )  # should be getting smaller
+            angle_HS_rad.append (round(res_HS, 2))
+            angle_HS_degree.append(  round(math.degrees(res_HS),2)  )
+                #if j == 0:
+    print('angle of HS:',angle_HS_degree)
                 
 
     # calculate TO angle
+    
     for side in Side:
-        angle_TO_arr = [[0 for _ in range(6)] for _ in range(len(TO[side]))]
-        angle_TO_arr_degree = [[0 for _ in range(6)] for _ in range(len(TO[side]))]
+        print('toe off angle for side %s:'%side)
+        # angle_TO_arr = [[0 for _ in range(1)] for _ in range(len(TO[side]))]
+        # angle_TO_arr_degree = [[0 for _ in range(1)] for _ in range(len(TO[side]))]
         for i in range (len(TO[side])):
             ele_TO = TO[side][i]
-            for j in range(5,-1,-1):
-                res_TO = math.atan((filt_heel[side][ele_TO-j][1] - filt_toe[side][ele_TO-j][1]) / (-filt_heel[side][ele_TO-j][0] + filt_toe[side][ele_TO-j][0])  )   # should be getting smaller
-                angle_TO_arr[i][j] = round(res_TO,2)
-                angle_TO_arr_degree[i][j] = round(math.degrees(res_TO),2)
-        angle_TO_rad[side].append(angle_TO_arr) 
-        angle_TO_degree[side].append(angle_TO_arr_degree)           
+            print('coordinate of heel and toe:',filt_heel[side][ele_TO], filt_toe[side][ele_TO] )
+            
+            coord_heelx_TO.append(filt_heel[side][ele_TO][0])
+            coord_toex_TO.append(filt_toe[side][ele_TO][0] )            
+            coord_heely_TO.append(filt_heel[side][ele_TO][1])
+            coord_toey_TO.append(filt_toe[side][ele_TO][1] )      
 
-    print('angle_HS in rad/s: \n',angle_HS_rad, '\n angle_HS in 。/s:\n',angle_HS_degree)
-    print('angle_TO in rad/s: \n',angle_TO_rad, '\n angle_TO in 。/s:\n',angle_TO_degree)
+            #for j in range(0,-1,-1):
+            res_TO = math.atan((filt_heel[side][ele_TO][1] - filt_toe[side][ele_TO][1]) / (-filt_heel[side][ele_TO][0] +filt_toe[side][ele_TO][0])  )   # should be getting smaller
+            angle_TO_rad.append(round(res_TO,2))
+            angle_TO_degree.append( round(math.degrees(res_TO),2))
+            #if j == 0:
+    print('angle of TO:',angle_TO_degree)         
 
-    
-    ### calculate the rate
+    # print( '\n angle_HS in 。/s:\n',angle_HS_degree) #'angle_HS in rad/s: \n',angle_HS_rad,
+    # print( '\n angle_TO in 。/s:\n',angle_TO_degree) # angle_TO in rad/s: \n',angle_TO_rad,
+
+
+    ########  write result into csv file     ############
+
+       ## reconstruct data as dataframe structure ##
+
     for side in Side:
-        for i in range (len(angle_HS_rad[side][0])):
-            rate_HS_ele = round(  (angle_HS_rad[side][0][i][0]-angle_HS_rad[side][0][i][-1])/ 0.05  ,  3)
-            rate_HS_ele_degree = round(  (angle_HS_degree[side][0][i][0]-angle_HS_degree[side][0][i][-1])/ 0.05  ,  3)
-            rate_HS_rad[side].append(rate_HS_ele)
-            rate_HS_degree[side].append(rate_HS_ele_degree)
-
-        for i in range ( len(angle_TO_rad[side][0]) ):
-            rate_TO_ele = round (  (angle_TO_rad[side][0][i][0]-angle_TO_rad[side][0][i][-1])/ 0.05 , 3)
-            rate_TO_ele_degree = round ( (angle_TO_degree[side][0][i][0]-angle_TO_degree[side][0][i][-1])/ 0.05 , 3)
-            rate_TO_rad[side].append(rate_TO_ele)
-            rate_TO_degree[side].append(rate_TO_ele_degree)
+        for ele in HS[side]:
+            frame_HS.append(ele)
+        for ele in TO[side]:
+            frame_TO.append(ele)
     
-    print('\n rate_HS in rad/s:\n', rate_HS_rad, '\n')
-    print('rate_TO in rad/s:\n',    rate_TO_rad, '\n')
+    df_HS = pandas.DataFrame(
+        {
+            'frame' :frame_HS,
+            'angle': angle_HS_degree,
+            'heel_x':coord_heelx_HS,
+            'heel_y':coord_heely_HS,
+            'toe_x':coord_toex_HS,
+            'toe_y':coord_toey_HS,
 
-    print('\n rate_HS in 。/s:\n', rate_HS_degree, '\n')
-    print('\n rate_TO in 。/s:\n', rate_TO_degree, '\n')
+        }
+    )
+    df_TO = pandas.DataFrame(
+        {
+            'frame': frame_TO,
+            'angle': angle_TO_degree,
+            'heel_x':coord_heelx_TO,
+            'heel_y':coord_heely_TO,
+            'toe_x':coord_toex_TO,
+            'toe_y':coord_toey_TO,
+        }
+    )
+    df = pandas.concat([df_HS,df_TO],axis = 1)
+    
+    
+    pkl_name =  filename.split("\\")[-1]
+    output_path = 'E:/NUS/5003/HSTO_coord'
+    if os.path.exists(output_path+'/%s.csv'%pkl_name):
+        os.remove(output_path+'/%s.csv'%pkl_name)
+    df.to_csv(output_path+'/%s.csv'%pkl_name, index=False)
+    
+
+
     ############################
     ###### End of IVY code #####
     ############################
